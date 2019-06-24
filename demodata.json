@@ -1,0 +1,70 @@
+{
+    "startdate": "2019-06-01",
+    "enddate": "2019-08-15",
+    "employees": [
+        {
+            "employeeId": 1,
+            "name": "Sven Svensson",
+            "vacations": [
+                {
+                    "vacationId": 1,
+                    "status": "approved",
+                    "startdate": "2019-06-30",
+                    "enddate": "2019-07-05"
+                },
+                {
+                    "vacationId": 2,
+                    "status": "approved",
+                    "startdate": "2019-07-07",
+                    "enddate": "2019-07-24"
+                }
+            ],
+            "parentalLeaves": [
+                {
+                    "vacationId": 1,
+                    "status": "approved",
+                    "startdate": "2019-07-25",
+                    "enddate": "2019-08-05"
+                }
+            ]
+        },
+        {
+            "employeeId": 2,
+            "name": "Anna Svensson"
+        },
+        {
+            "employeeId": 3,
+            "name": "Göran Svensson",
+            "vacations": [
+                {
+                    "vacationId": 1,
+                    "status": "approved",
+                    "startdate": "2019-06-02",
+                    "enddate": "2019-06-20"
+                },
+                {
+                    "vacationId": 2,
+                    "status": "approved",
+                    "startdate": "2019-07-20",
+                    "enddate": "2019-07-24"
+                }
+            ]
+        },
+        {
+            "employeeId": 4,
+            "name": "Lisa Svensson"
+        },
+        {
+            "employeeId": 5,
+            "name": "Gunde Svensson"
+        },
+        {
+            "employeeId": 6,
+            "name": "Patricia Svensson"
+        },
+        {
+            "employeeId": 7,
+            "name": "Håkan Svensson"
+        }
+    ]
+}
