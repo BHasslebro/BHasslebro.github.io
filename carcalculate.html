@@ -74,6 +74,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('parseButton').addEventListener('click', parseVehicleInfo);
             document.getElementById('addCarButton').addEventListener('click', addCar);
+            loadFromLocalStorage(); // Load saved data when the page loads
         });
 
         function parseVehicleInfo() {
@@ -175,6 +176,7 @@
             updateCarList();
             compareCards();
             updateExportData();
+            saveToLocalStorage(); // Save data after adding a car
         }
 
         function updateExportData() {
@@ -229,6 +231,21 @@
             updateCarList();
             compareCards();
             updateExportData();
+            saveToLocalStorage(); // Save data after removing a car
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('carData', JSON.stringify(cars));
+        }
+
+        function loadFromLocalStorage() {
+            const storedData = localStorage.getItem('carData');
+            if (storedData) {
+                cars = JSON.parse(storedData);
+                updateCarList();
+                compareCards();
+                updateExportData();
+            }
         }
 
         function compareCards() {
