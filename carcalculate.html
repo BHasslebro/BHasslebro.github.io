@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Svensk Bilkostnadskalkylator</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        h1, h2 { color: #333; }
+        label { display: block; margin-top: 10px; }
+        input, select, textarea { width: 100%; padding: 5px; margin-top: 5px; }
+        button { margin-top: 20px; padding: 10px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+        #result, #comparison { margin-top: 20px; }
+        #result p, #comparison p { margin: 5px 0; }
+        .total { font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .car-item { cursor: pointer; padding: 10px; border: 1px solid #ddd; margin-bottom: 10px; }
+        .car-item:hover { background-color: #f0f0f0; }
+        .car-details { display: none; margin-top: 10px; padding: 10px; background-color: #f9f9f9; border: 1px solid #ddd; }
+        #exportData {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Svensk Bilkostnadskalkylator</h1>
+    <div>
+        <label for="vehicleInfo">Klistra in fordonsuppgifter från Transportstyrelsen:</label>
+        <textarea id="vehicleInfo" rows="10"></textarea>
+        <button id="parseButton">Hämta Fordonsinformation</button>
+    </div>
+    <div id="carInfo" style="display: none;">
+        <h2>Fordonsinformation</h2>
+        <p id="regNumber"></p>
+        <p id="carBrand"></p>
+        <p id="carModel"></p>
+        <p id="carYear"></p>
+        <label for="carPrice">Bilpris (SEK):</label>
+        <input type="number" id="carPrice" required>
+        <label for="fuelType">Drivmedel:</label>
+        <select id="fuelType">
+            <option value="Bensin">Bensin</option>
+            <option value="Diesel">Diesel</option>
+            <option value="El">El</option>
+        </select>
+        <label for="fuelConsumption">Bränsleförbrukning (l/100km eller kWh/100km):</label>
+        <input type="number" id="fuelConsumption" step="0.1" required>
+        <label for="annualTax">Årsskatt (SEK):</label>
+        <input type="number" id="annualTax" required>
+        <label for="insuranceCost">Månadskostnad försäkring (SEK):</label>
+        <input type="number" id="insuranceCost" required>
+        <label for="serviceCost">Årlig servicekostnad (SEK):</label>
+        <input type="number" id="serviceCost" required>
+        <label for="mileage">Nuvarande mätarställning (km):</label>
+        <input type="number" id="mileage" required>
+    </div>
+    <div>
+        <label for="annualMileage">Årlig körsträcka (km):</label>
+        <input type="number" id="annualMileage" value="15000" required>
+        <button id="addCarButton">Lägg till bil</button>
+    </div>
+    <div id="carList"></div>
+    <div id="comparison"></div>
+    <div id="exportData"></div>
+
+    <script>
+        let cars = [];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('parseButton').addEventListener('click', parseVehicleInfo);
+            document.getElementById('addCarButton').addEventListener('click', addCar);
+        });
+
+        function parseVehicleInfo() {
+            const info = document.getElementById('vehicleInfo').value;
+            const regNumberMatch = info.match(/Registreringsnummer\*?\*?\s*(\w+)/);
+            const brandMatch = info.match(/Fabrikat\s*\*?\*?\s*(\w+)/);
+            const modelMatch = info.match(/Handelsbeteckning\s*\*?\*?\s*([\w\d\s-]+)/);
+            const yearMatch = info.match(/Fordonsår\s*\*?\*?\s*(\d+)/);
+            const fuelTypeMatch = info.match(/Drivmedel\s*(\w+)/);
+            const annualTaxMatch = info.match(/Årsskatt\s*(\d+)/);
+            const mileageMatch = info.match(/Mätarställning\s*(\d+)/);
+            
+            const fuelConsumptionMatchNEDC = info.match(/Blandad körning\s*(\d+,\d+)/);
+            const fuelConsumptionMatchWLTP = info.match(/Elenergiförbrukning blandad\s*(\d+)/);
+
+            if (regNumberMatch) document.getElementById('regNumber').textContent = `Registreringsnummer: ${regNumberMatch[1]}`;
+            if (brandMatch) document.getElementById('carBrand').textContent = `Märke: ${brandMatch[1]}`;
+            if (modelMatch) {
+                // Remove "Fordonsstatus" and any text after it from the model
+                const cleanModel = modelMatch[1].split('Fordonsstatus')[0].trim();
+                document.getElementById('carModel').textContent = `Modell: ${cleanModel}`;
+            }
+            if (yearMatch) document.getElementById('carYear').textContent = `År: ${yearMatch[1]}`;
+            if (mileageMatch) document.getElementById('mileage').value = mileageMatch[1];
+            
+            let fuelType = 'Bensin';
+            if (fuelTypeMatch) {
+                const fuelTypeValue = fuelTypeMatch[1].toLowerCase();
+                if (fuelTypeValue === 'el') {
+                    fuelType = 'El';
+                } else if (fuelTypeValue === 'diesel') {
+                    fuelType = 'Diesel';
+                }
+            }
+            document.getElementById('fuelType').value = fuelType;
+            
+            if (annualTaxMatch) document.getElementById('annualTax').value = annualTaxMatch[1];
+            
+            if (fuelConsumptionMatchWLTP) {
+                document.getElementById('fuelConsumption').value = fuelConsumptionMatchWLTP[1] / 10; // Convert Wh/km to kWh/100km
+            } else if (fuelConsumptionMatchNEDC) {
+                document.getElementById('fuelConsumption').value = fuelConsumptionMatchNEDC[1].replace(',', '.');
+            }
+
+            const carPrice = parseFloat(document.getElementById('carPrice').value) || 300000;
+            const carAge = new Date().getFullYear() - (yearMatch ? parseInt(yearMatch[1]) : 2020);
+            setDefaultInsuranceAndServiceCosts(fuelType, carPrice, carAge);
+
+            document.getElementById('carInfo').style.display = 'block';
+        }
+    
+        function setDefaultInsuranceAndServiceCosts(fuelType, carPrice, carAge) {
+            let insuranceCost = carPrice * 0.04 / 12;
+            if (carAge > 5) insuranceCost *= 0.8;
+
+            let serviceCost;
+            switch (fuelType) {
+                case 'El':
+                    serviceCost = 3000 + (carAge * 200);
+                    break;
+                case 'Diesel':
+                    serviceCost = 5000 + (carAge * 500);
+                    break;
+                default:
+                    serviceCost = 4000 + (carAge * 400);
+            }
+
+            document.getElementById('insuranceCost').value = Math.round(insuranceCost);
+            document.getElementById('serviceCost').value = Math.round(serviceCost);
+        }
+
+        function addCar() {
+            const car = {
+                regNumber: document.getElementById('regNumber').textContent.split(': ')[1],
+                brand: document.getElementById('carBrand').textContent.split(': ')[1],
+                model: document.getElementById('carModel').textContent.split(': ')[1],
+                year: parseInt(document.getElementById('carYear').textContent.split(': ')[1]),
+                price: parseFloat(document.getElementById('carPrice').value),
+                fuelType: document.getElementById('fuelType').value,
+                fuelConsumption: parseFloat(document.getElementById('fuelConsumption').value),
+                annualTax: parseFloat(document.getElementById('annualTax').value),
+                insuranceCost: parseFloat(document.getElementById('insuranceCost').value),
+                serviceCost: parseFloat(document.getElementById('serviceCost').value),
+                mileage: parseFloat(document.getElementById('mileage').value),
+                annualMileage: parseFloat(document.getElementById('annualMileage').value),
+                maxTrailerWeight: 0,
+                wltpRange: 0
+            };
+
+            // Parse max trailer weight and WLTP range
+            const vehicleInfo = document.getElementById('vehicleInfo').value;
+            const maxTrailerWeightMatch = vehicleInfo.match(/Max släpvagnsvikt\s*(\d+)/) || vehicleInfo.match(/Maxvikt för släpkärra\s*(\d+)/);
+            const wltpRangeMatch = vehicleInfo.match(/Räckvidd\s*(\d+)/);
+
+            if (maxTrailerWeightMatch) car.maxTrailerWeight = parseInt(maxTrailerWeightMatch[1]);
+            if (wltpRangeMatch) car.wltpRange = parseInt(wltpRangeMatch[1]);
+
+            cars.push(car);
+            updateCarList();
+            compareCards();
+            updateExportData();
+        }
+
+        function updateExportData() {
+            const exportDiv = document.getElementById('exportData');
+            let exportString = "Bil\tMånadskostnad\tVärdeminskning\tSkatt\tBränsle\tService\tFörsäkring\tSläpvagnsvikt\tWLTP\n";
+
+            cars.forEach(car => {
+                const costs = calculateCosts(car);
+                const carName = `${car.brand} ${car.model} (${car.year}) - ${car.regNumber}`;
+                
+                // Function to format numbers with comma as decimal separator
+                const formatNumber = (number) => number.toFixed(2).replace('.', ',');
+                
+                exportString += `${carName}\t${formatNumber(costs.monthlyTotal)}\t${formatNumber(costs.monthlyValueLoss)}\t${formatNumber(car.annualTax / 12)}\t${formatNumber(costs.fuelCost)}\t${formatNumber(car.serviceCost / 12)}\t${formatNumber(car.insuranceCost)}\t${car.maxTrailerWeight}\t${car.wltpRange}\n`;
+            });
+
+            exportDiv.innerHTML = '<h3>Exportera data (kopiera och klistra in i Google Sheets):</h3>';
+            exportDiv.innerHTML += `<textarea rows="5" cols="100">${exportString}</textarea>`;
+        }
+
+        function updateCarList() {
+            const carList = document.getElementById('carList');
+            carList.innerHTML = '<h2>Tillagda bilar</h2>';
+            cars.forEach((car, index) => {
+                const costs = calculateCosts(car);
+                carList.innerHTML += `
+                    <div class="car-item" onclick="toggleCarDetails(${index})">
+                        <h3>${car.brand} ${car.model} (${car.year}) - ${car.regNumber}</h3>
+                        <p>Månadskostnad: ${costs.monthlyTotal.toFixed(2)} SEK</p>
+                        <div id="carDetails${index}" class="car-details">
+                            <p>Månatlig värdeminskning: ${costs.monthlyValueLoss.toFixed(2)} SEK</p>
+                            <p>Månadsskatt: ${costs.monthlyTax.toFixed(2)} SEK</p>
+                            <p>Månadskostnad bränsle: ${costs.fuelCost.toFixed(2)} SEK</p>
+                            <p>Månadskostnad försäkring: ${car.insuranceCost.toFixed(2)} SEK</p>
+                            <p>Månadskostnad service: ${costs.monthlyService.toFixed(2)} SEK</p>
+                            <p class="total">Total månadskostnad: ${costs.monthlyTotal.toFixed(2)} SEK</p>
+                            <p>Beräknad värdeminskning över 3 år: ${(costs.monthlyValueLoss * 36).toFixed(2)} SEK</p>
+                        </div>
+                        <button onclick="removeCar(${index}); event.stopPropagation();">Ta bort</button>
+                    </div>
+                `;
+            });
+        }
+
+        function toggleCarDetails(index) {
+            const detailsElement = document.getElementById(`carDetails${index}`);
+            detailsElement.style.display = detailsElement.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function removeCar(index) {
+            cars.splice(index, 1);
+            updateCarList();
+            compareCards();
+            updateExportData();
+        }
+
+        function compareCards() {
+            if (cars.length === 0) {
+                document.getElementById('comparison').innerHTML = '<p>Inga bilar att jämföra.</p>';
+                return;
+            }
+
+            let comparisonHTML = '<h2>Kostnadsjämförelse</h2>';
+            comparisonHTML += '<table><tr><th>Bil</th><th>Månadskostnad</th><th>Årskostnad</th><th>3-årskostnad</th></tr>';
+
+            cars.forEach(car => {
+                const costs = calculateCosts(car);
+                comparisonHTML += `
+                    <tr>
+                        <td>${car.brand} ${car.model} (${car.year})</td>
+                        <td>${costs.monthlyTotal.toFixed(2)} SEK</td>
+                        <td>${(costs.monthlyTotal * 12).toFixed(2)} SEK</td>
+                        <td>${(costs.monthlyTotal * 36).toFixed(2)} SEK</td>
+                    </tr>
+                `;
+            });
+
+            comparisonHTML += '</table>';
+            document.getElementById('comparison').innerHTML = comparisonHTML;
+        }
+
+        function calculateCosts(car) {
+            const ageInThreeYears = new Date().getFullYear() + 3 - car.year;
+            const mileageInThreeYears = car.mileage + (car.annualMileage * 3);
+            const valueLossPercentage = calculateValueLossPercentage(ageInThreeYears, mileageInThreeYears, car.fuelType);
+            const valueLoss = car.price * valueLossPercentage;
+            const monthlyValueLoss = valueLoss / 36;
+
+            let fuelCost;
+            if (car.fuelType === "El") {
+                const electricityPrice = 1.5;
+                fuelCost = (car.annualMileage / 12) * (car.fuelConsumption / 100) * electricityPrice;
+            } else {
+                const fuelPrices = {"Bensin": 17, "Diesel": 18};
+                fuelCost = (car.annualMileage / 12) * (car.fuelConsumption / 100) * fuelPrices[car.fuelType];
+            }
+
+            const monthlyTax = car.annualTax / 12;
+            const monthlyService = car.serviceCost / 12;
+            const monthlyTotal = monthlyValueLoss + monthlyTax + fuelCost + car.insuranceCost + monthlyService;
+
+            return {
+                monthlyValueLoss,
+                monthlyTax,
+                fuelCost,
+                monthlyService,
+                monthlyTotal
+            };
+        }
+
+        function calculateValueLossPercentage(ageInYears, mileage, fuelType) {
+            let baseRate = 0.15;
+
+            if (ageInYears <= 3) {
+                baseRate += 0.1;
+            } else if (ageInYears <= 6) {
+                baseRate += 0.05;
+            }
+
+            if (mileage > 150000) {
+                baseRate += 0.1;
+            } else if (mileage > 100000) {
+                baseRate += 0.05;
+            }
+
+            if (fuelType === 'El') {
+                baseRate -= 0.05;
+            } else if (fuelType === 'Diesel') {
+                baseRate += 0.02;
+            }
+
+            return Math.min(baseRate, 0.8);
+        }
+
+        function updateExportData() {
+            const exportDiv = document.getElementById('exportData');
+            let exportString = "Bil\tMånadskostnad\tVärdeminskning\tSkatt\tBränsle\tService\tFörsäkring\tSläpvagnsvikt\tWLTP\n";
+
+            cars.forEach(car => {
+                const costs = calculateCosts(car);
+                const carName = `${car.brand} ${car.model} (${car.year}) - ${car.regNumber}`;
+                
+                // Function to format numbers with comma as decimal separator
+                const formatNumber = (number) => number.toFixed(2).replace('.', ',');
+                
+                exportString += `${carName}\t${formatNumber(costs.monthlyTotal)}\t${formatNumber(costs.monthlyValueLoss)}\t${formatNumber(car.annualTax / 12)}\t${formatNumber(costs.fuelCost)}\t${formatNumber(car.serviceCost / 12)}\t${formatNumber(car.insuranceCost)}\t${car.maxTrailerWeight}\t${car.wltpRange}\n`;
+            });
+
+            exportDiv.innerHTML = '<h3>Exportera data (kopiera och klistra in i Google Sheets):</h3>';
+            exportDiv.innerHTML += `<textarea rows="5" cols="100">${exportString}</textarea>`;
+        }
+
+    </script>
+</body>
+</html>
